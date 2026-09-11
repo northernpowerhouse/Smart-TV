@@ -491,7 +491,7 @@ const ModernDetailContent = (props) => {
 					serverUrl={effectiveServerUrl}
 					cardType="portrait"
 					onSelect={onSelectItem}
-					seerrSeasonStatus={seerr.seasonMarkers.get(season.IndexNumber)}
+					seerrSeasonStatus={settings.showSeerrAvailabilityBadges !== false ? seerr.seasonMarkers.get(season.IndexNumber) : null}
 				/>
 			))}
 		</RowContainer>

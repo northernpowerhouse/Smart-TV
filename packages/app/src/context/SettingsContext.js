@@ -191,7 +191,8 @@ const VALUE_CONVERSIONS = {
 
 export const SYNCABLE_KEYS = [
 	'showShuffleButton', 'shuffleContentType', 'showGenresButton',
-	'showFavoritesButton', 'showLibrariesInToolbar', 'mergeContinueWatchingNextUp',
+	'showFavoritesButton', 'showLiveTvButton', 'showLibrariesInToolbar',
+	'mergeContinueWatchingNextUp',
 	'nextUpMaxDays',
 	'hiddenContinueWatchingItems', 'hiddenNextUpSeries',
 	'mdblistEnabled', 'mdblistRatingSources', 'tmdbEpisodeRatingsEnabled',
@@ -244,7 +245,8 @@ export const SYNCABLE_KEYS = [
 	'mergeRadarrSonarrCalendars',
 	'radarrCalendarShowCinema', 'radarrCalendarShowDigital', 'radarrCalendarShowPhysical',
 	'radarrCalendarShowDate', 'sonarrCalendarShowDate', 'sonarrCalendarShowEpisodeInfo',
-	'showSeerrButton', 'showServerMessagesButton',
+	'showSeerrButton', 'seerrShowMissingCollectionItems', 'showSeerrAvailabilityBadges',
+	'showServerMessagesButton',
 	'screensaverMode', 'screensaverClockMode',
 	'screensaverBackdrop', 'screensaverComponent', 'screensaverMovement',
 	'screensaverPosition', 'screensaverSize', 'screensaverContentType',

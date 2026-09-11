@@ -7,6 +7,7 @@ import {getItemSubtitlePref, getSeriesSubtitlePref, getSeriesAudioPref} from '..
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
 import {findParentCollection} from './parentCollection';
 import {getOnlineRecommendations, mergeRecommendations} from '../../services/homeRecommendations';
+import {fetchMissingCollectionItems, mergeCollectionWithMissing} from './seerrMissingCollectionItems';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
 // on its own, then the rows that hang off it fill in behind, because waiting for all of them
@@ -21,7 +22,7 @@ const seedFrom = (candidate, id) => (candidate && candidate.Id === id ? candidat
 // it ends up with.
 const SIMILAR_LIMIT = 15;
 
-const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, settings, recommendationsSupported, tagWithServerInfo, skip}) => {
+const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, settings, recommendationsSupported, seerrEnabled, tagWithServerInfo, skip}) => {
 	const seedRef = useRef(initialItem);
 	seedRef.current = initialItem;
 	// Read where they are used rather than depended on, so a change to either one
@@ -30,6 +31,10 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 	settingsRef.current = settings;
 	const scoringRef = useRef(recommendationsSupported);
 	scoringRef.current = recommendationsSupported;
+	// A server with no Seerr behind it is never asked for missing titles, since that
+	// costs failed round trips on every collection opened and can answer nothing.
+	const seerrEnabledRef = useRef(seerrEnabled);
+	seerrEnabledRef.current = seerrEnabled;
 
 	const [item, setItem] = useState(() => seedFrom(initialItem, itemId));
 	// Whether what is on screen is still the row it was opened from rather than the record
@@ -78,6 +83,10 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			setIsLoading(false);
 			return;
 		}
+
+		// The Seerr pass is the one thing here that settles after the load has moved
+		// on, so its answer is dropped when the screen already shows something else.
+		let cancelled = false;
 
 		const loadItem = async () => {
 			const seed = seedFrom(seedRef.current, itemId);
@@ -195,9 +204,22 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						ParentId: data.Id,
 						SortBy: 'ProductionYear,SortName',
 						SortOrder: 'Ascending',
-						Fields: 'PrimaryImageAspectRatio,ProductionYear'
+						Fields: 'PrimaryImageAspectRatio,ProductionYear,ProviderIds'
 					}).catch(() => null);
-					if (collectionData) setCollectionItems(tagWithServerInfo(collectionData.Items || []));
+					if (collectionData) {
+						const tagged = tagWithServerInfo(collectionData.Items || []);
+						setCollectionItems(tagged);
+						if (tagged.length > 0 && seerrEnabledRef.current) {
+							fetchMissingCollectionItems({
+								boxSet: data,
+								members: tagged,
+								settings: settingsRef.current
+							}).then((missing) => {
+								if (cancelled || missing.length === 0) return;
+								setCollectionItems((prev) => mergeCollectionWithMissing(prev, missing));
+							}).catch(() => {});
+						}
+					}
 				}
 
 				if (data.Type === 'MusicAlbum') {
@@ -272,13 +294,24 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						ParentId: boxSet.Id,
 						SortBy: 'PremiereDate,SortName',
 						SortOrder: 'Ascending',
-						Fields: 'PrimaryImageAspectRatio,ProductionYear'
+						Fields: 'PrimaryImageAspectRatio,ProductionYear,ProviderIds'
 					}).catch(() => null);
 					// A collection holding nothing but the title being looked at says nothing.
 					const members = colData?.Items || [];
 					if (members.length > 1) {
+						const tagged = tagWithServerInfo(members);
 						setParentCollectionName(boxSet.Name || $L('Collection'));
-						setParentCollection(tagWithServerInfo(members));
+						setParentCollection(tagged);
+						if (seerrEnabledRef.current) {
+							fetchMissingCollectionItems({
+								boxSet,
+								members: tagged,
+								settings: settingsRef.current
+							}).then((missing) => {
+								if (cancelled || missing.length === 0) return;
+								setParentCollection((prev) => mergeCollectionWithMissing(prev, missing));
+							}).catch(() => {});
+						}
 					}
 				}
 
@@ -291,6 +324,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			bg().catch(() => {});
 		};
 		loadItem();
+		return () => { cancelled = true; };
 	}, [effectiveApi, itemId, tagWithServerInfo, skip]);
 
 	useEffect(() => {
